@@ -4,8 +4,9 @@ __pycache__/
 .venv/
 *.egg-info/
 .DS_Store
-*/netcdf/*
+/netcdf/*
 logs/
+pywrdrb/inputs/*/predicted_inflows_mgd.csv
 pywrdrb/outputs/*
 pywrdrb/models/*
 figures/*
