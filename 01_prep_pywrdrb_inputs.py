@@ -30,12 +30,7 @@ pywrdrb.load_pn_config(pn_config)
 if __name__ == "__main__":
 
     for dataset in DATASET_NAMES:
-        
-        # check if predicted_inflows_mgd.csv and catchment_inflow_mgd.csv already exist
-        # skip if they do
-        if os.path.exists(f"pywrdrb/inputs/{dataset}/predicted_inflows_mgd.csv") and os.path.exists(f"pywrdrb/inputs/{dataset}/catchment_inflow_mgd.csv"):
-            continue
-        
+
         
         ## Calculate catchment inflows
         f = f"pywrdrb/inputs/{dataset}/gage_flow_mgd.csv"
@@ -51,12 +46,12 @@ if __name__ == "__main__":
         # Save the inflow_df to a CSV file
         f = f"pywrdrb/inputs/{dataset}/catchment_inflow_mgd.csv"
         inflow_df.to_csv(f)
-        
-        ### Predicted flows
+
         # Get the start and end dates
         start_date = inflow_df.index.min()
         end_date = inflow_df.index.max()
-
+        
+        print(f"Generating predicted inflows for {dataset}...")
         inflow_predictor = pywrdrb.pre.PredictedInflowPreprocessor(
             flow_type=dataset,
             start_date=start_date,
@@ -67,3 +62,25 @@ if __name__ == "__main__":
         inflow_predictor.load()
         inflow_predictor.process()
         inflow_predictor.save()
+        
+        ### Generate extrapolated diversions
+        print(f"Generating extrapolated diversions for {dataset}...")
+        
+        # NYC
+        nyc_diversion_preprocessor = pywrdrb.pre.ExtrapolatedDiversionPreprocessor(
+            loc="nyc",
+            flow_type=dataset,
+        )
+        
+        nyc_diversion_preprocessor.load()
+        nyc_diversion_preprocessor.process()
+        nyc_diversion_preprocessor.save()
+        
+        # NJ
+        nj_diversion_preprocessor = pywrdrb.pre.ExtrapolatedDiversionPreprocessor(
+            loc="nj",
+            flow_type=dataset,
+        )
+        nj_diversion_preprocessor.load()
+        nj_diversion_preprocessor.process()
+        nj_diversion_preprocessor.save()

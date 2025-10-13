@@ -57,36 +57,36 @@ def plot_quantile_space_visualization(quantile_matrix, scenario_definitions, nod
         90: '-',    # solid (High)
     }
     
-    # Plot scenario paths
-    for scenario_name, (jun_q, dec_q) in scenario_definitions.items():
-        # Create path through quantile space
-        months = np.arange(0, 13)
-        quantiles = np.zeros(13)
+    # # Plot scenario paths
+    # for scenario_name, (jun_q, dec_q) in scenario_definitions.items():
+    #     # Create path through quantile space
+    #     months = np.arange(0, 13)
+    #     quantiles = np.zeros(13)
         
-        for month_idx in range(13):
-            if month_idx <= 6:  # Jun through Dec
-                weight = month_idx / 6
-                quantiles[month_idx] = jun_q + weight * (dec_q - jun_q)
-            else:  # Jan through Jun (wrapping back)
-                weight = (month_idx - 6) / 6
-                quantiles[month_idx] = dec_q + weight * (jun_q - dec_q)
+    #     for month_idx in range(13):
+    #         if month_idx <= 6:  # Jun through Dec
+    #             weight = month_idx / 6
+    #             quantiles[month_idx] = jun_q + weight * (dec_q - jun_q)
+    #         else:  # Jan through Jun (wrapping back)
+    #             weight = (month_idx - 6) / 6
+    #             quantiles[month_idx] = dec_q + weight * (jun_q - dec_q)
         
-        # Adjust months for plotting (0-12 for Jun-Jun)
-        plot_months = months.copy()
+    #     # Adjust months for plotting (0-12 for Jun-Jun)
+    #     plot_months = months.copy()
         
-        # Plot the path
-        color = jun_colors[jun_q]
-        linestyle = dec_linestyles[dec_q]
-        linewidth = 2.5
+    #     # Plot the path
+    #     color = jun_colors[jun_q]
+    #     linestyle = dec_linestyles[dec_q]
+    #     linewidth = 2.5
         
-        ax.plot(plot_months, quantiles, 
-                color=color, linestyle=linestyle, linewidth=linewidth,
-                alpha=0.9, zorder=10)
+    #     ax.plot(plot_months, quantiles, 
+    #             color=color, linestyle=linestyle, linewidth=linewidth,
+    #             alpha=0.9, zorder=10)
         
-        # Add anchor points
-        ax.scatter([0, 6], [jun_q, dec_q], 
-                  color=color, s=100, zorder=11, 
-                  edgecolors='white', linewidths=1.5)
+    #     # Add anchor points
+    #     ax.scatter([0, 6], [jun_q, dec_q], 
+    #               color=color, s=100, zorder=11, 
+    #               edgecolors='white', linewidths=1.5)
     
     # Customize axes
     ax.set_xlabel('Month', fontsize=13, fontweight='bold')
