@@ -13,3 +13,4 @@ pywrdrb/inputs/*/diversion_nj_extrapolated_mgd.csv
 pywrdrb/outputs/*
 pywrdrb/models/*
 figures/*
+/stats/

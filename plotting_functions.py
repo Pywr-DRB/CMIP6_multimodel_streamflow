@@ -1,17 +1,14 @@
-import os
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
-
-import seaborn as sns
-import pywrdrb
-from config import DATASET_NAMES, DATASET_COLORS_BY_PERIOD
-from styles import colordict_by_gcm, markerdict_by_hydrology_model
-from utils import parse_dataset_settings_from_name, dataset_settings, dataset_baselines, calculate_iqr_scenarios
+from styles import colordict_by_gcm
+from utils import dataset_settings
 
 
-def plot_quantile_space_visualization(quantile_matrix, scenario_definitions, node, fdir):
+def plot_quantile_space_visualization(quantile_matrix, 
+                                      scenario_definitions, 
+                                      node, 
+                                      fname):
     """
     Create a visualization showing the quantile space matrix with scenario paths.
     
@@ -57,36 +54,36 @@ def plot_quantile_space_visualization(quantile_matrix, scenario_definitions, nod
         90: '-',    # solid (High)
     }
     
-    # # Plot scenario paths
-    # for scenario_name, (jun_q, dec_q) in scenario_definitions.items():
-    #     # Create path through quantile space
-    #     months = np.arange(0, 13)
-    #     quantiles = np.zeros(13)
+    # Plot scenario paths
+    for scenario_name, (jun_q, dec_q) in scenario_definitions.items():
+        # Create path through quantile space
+        months = np.arange(0, 13)
+        quantiles = np.zeros(13)
         
-    #     for month_idx in range(13):
-    #         if month_idx <= 6:  # Jun through Dec
-    #             weight = month_idx / 6
-    #             quantiles[month_idx] = jun_q + weight * (dec_q - jun_q)
-    #         else:  # Jan through Jun (wrapping back)
-    #             weight = (month_idx - 6) / 6
-    #             quantiles[month_idx] = dec_q + weight * (jun_q - dec_q)
+        for month_idx in range(13):
+            if month_idx <= 6:  # Jun through Dec
+                weight = month_idx / 6
+                quantiles[month_idx] = jun_q + weight * (dec_q - jun_q)
+            else:  # Jan through Jun (wrapping back)
+                weight = (month_idx - 6) / 6
+                quantiles[month_idx] = dec_q + weight * (jun_q - dec_q)
         
-    #     # Adjust months for plotting (0-12 for Jun-Jun)
-    #     plot_months = months.copy()
+        # Adjust months for plotting (0-12 for Jun-Jun)
+        plot_months = months.copy()
         
-    #     # Plot the path
-    #     color = jun_colors[jun_q]
-    #     linestyle = dec_linestyles[dec_q]
-    #     linewidth = 2.5
+        # Plot the path
+        color = jun_colors[jun_q]
+        linestyle = dec_linestyles[dec_q]
+        linewidth = 2.5
         
-    #     ax.plot(plot_months, quantiles, 
-    #             color=color, linestyle=linestyle, linewidth=linewidth,
-    #             alpha=0.9, zorder=10)
+        ax.plot(plot_months, quantiles, 
+                color=color, linestyle=linestyle, linewidth=linewidth,
+                alpha=0.9, zorder=10)
         
-    #     # Add anchor points
-    #     ax.scatter([0, 6], [jun_q, dec_q], 
-    #               color=color, s=100, zorder=11, 
-    #               edgecolors='white', linewidths=1.5)
+        # Add anchor points
+        ax.scatter([0, 6], [jun_q, dec_q], 
+                  color=color, s=100, zorder=11, 
+                  edgecolors='white', linewidths=1.5)
     
     # Customize axes
     ax.set_xlabel('Month', fontsize=13, fontweight='bold')
@@ -124,9 +121,76 @@ def plot_quantile_space_visualization(quantile_matrix, scenario_definitions, nod
     
     # Save figure
     plt.tight_layout()
-    plt.savefig(f'{fdir}/quantile_space_visualization_{node}.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    plt.savefig(fname, dpi=300, bbox_inches='tight')
 
+
+def plot_quantile_space_with_gcm_traces(quantile_matrix, 
+                                        df_reordered_quantiles,
+                                        node, 
+                                        fname):
+    """
+    Create visualization showing quantile space matrix with individual GCM traces.
+    
+    Parameters:
+    -----------
+    quantile_matrix : np.ndarray
+        Shape (12, 100) - quantile values for each month
+    df_reordered_quantiles : pd.DataFrame
+        13 rows × N columns, with quantile values (0-100) for each GCM
+    node : str
+        Node name for title
+    fdir : str
+        Output directory
+    """
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # Create heatmap background
+    heatmap_data = quantile_matrix.T  # Shape: (100, 12)
+    
+    # Plot heatmap with diverging colormap centered at 0
+    norm = TwoSlopeNorm(vmin=heatmap_data.min(), vcenter=0, vmax=heatmap_data.max())
+    im = ax.imshow(heatmap_data, aspect='auto', origin='lower', 
+                   cmap='RdBu', norm=norm,
+                   interpolation='bilinear',
+                   extent=[0, 12, 0, 100])
+    
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax, label='Flow Change (%)', pad=0.02)
+    
+    # Plot individual GCM traces (use len(df_reordered_quantiles) for x-coords)
+    for col in df_reordered_quantiles.columns:
+        ax.plot(range(len(df_reordered_quantiles)), df_reordered_quantiles[col].values,
+                color='black', linewidth=0.8, alpha=0.3, zorder=10)
+    
+    # Customize axes
+    ax.set_xlabel('Month', fontsize=13, fontweight='bold')
+    ax.set_ylabel('Quantile (%)', fontsize=13, fontweight='bold')
+    ax.set_title(f'{node.replace("_", " ").title()} - GCM Traces in Quantile Space\n' + 
+                 'Individual Model Trajectories Through Quantile Matrix',
+                 fontsize=14, fontweight='bold', pad=20)
+    
+    # Set x-axis ticks and labels
+    month_labels = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 
+                    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+    ax.set_xticks(range(13))
+    ax.set_xticklabels(month_labels, fontsize=10)
+    
+    # Set y-axis ticks
+    ax.set_yticks([0, 10, 25, 50, 75, 90, 100])
+    ax.set_ylim(0, 100)
+    ax.set_xlim(0, 12)
+    
+    # Add grid
+    ax.grid(True, alpha=0.3, linestyle=':', color='white', linewidth=0.5, zorder=5)
+    
+    # Add text annotation
+    ax.text(0.02, 0.98, f'N = {len(df_reordered_quantiles.columns)} models', 
+            transform=ax.transAxes, fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    
+    # Save figure
+    plt.tight_layout()
+    plt.savefig(fname, dpi=300, bbox_inches='tight')
 
 
 def plot_monthly_stat_lines(df, 

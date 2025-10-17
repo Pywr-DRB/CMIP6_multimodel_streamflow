@@ -8,7 +8,7 @@ HUC_CODES = [
 ]
 
 # Get dataset names from the ./Data/ folder
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'netcdf')
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'pywrdrb/inputs')
 if not os.path.exists(DATA_DIR):
     raise FileNotFoundError(f"Data directory does not exist: {DATA_DIR}")
 
