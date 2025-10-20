@@ -13,8 +13,6 @@ CONSIDER_NODES = [
     'nyc_inflow'
 ]
 
-plot_datasets = [d for d in DATASET_NAMES if 'PRMS' not in d]
-
 if __name__ == "__main__":
     ### Load data through pywrdrb API    
     # Setup pathnavigator
@@ -28,6 +26,9 @@ if __name__ == "__main__":
     pn = pywrdrb.get_pn_object()
     sc_flows = list(pn.sc.to_dict().keys())
     flowtype_opts = [i.replace("flows/", "") for i in sc_flows]
+
+    # drop flowtyps that start with 'rev_'
+    flowtype_opts = [ft for ft in flowtype_opts if not ft.startswith('rev_')]
 
     results_sets = ['major_flow']
     flowtypes = flowtype_opts
@@ -103,6 +104,9 @@ if __name__ == "__main__":
         monthly_stds = monthly.groupby('month').std()
         
         # Save monthly means and std
+        # make stats/ if not exists
+        if not os.path.exists('stats'):
+            os.makedirs('stats')
         annual_median.to_csv(f'stats/datasets_{node}_annual_median.csv')
         annual_means.to_csv(f'stats/datasets_{node}_annual_means.csv')
         annual_stds.to_csv(f'stats/datasets_{node}_annual_stds.csv')

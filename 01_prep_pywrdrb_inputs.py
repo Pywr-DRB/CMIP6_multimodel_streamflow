@@ -13,7 +13,10 @@
 
 
 import os
+import numpy as np
 import pandas as pd
+from mpi4py import MPI
+
 import pywrdrb
 from pywrdrb.pre.flows import _subtract_upstream_catchment_inflows
 
@@ -24,6 +27,19 @@ REDO_INFLOW_PREDICTION = False
 REDO_DIVERSION_EXTRAPOLATION = True
 REDO_DIVERSION_PREDICTION = True
 
+
+USE_MPI = True
+if USE_MPI:
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    print(f"MPI enabled: rank {rank} of {size}")
+else:
+    comm = None
+    rank = 0
+    size = 1
+    print("MPI not enabled.")
+
 # Setup pathnavigator
 pn_config = pywrdrb.get_pn_config()
 for dataset in DATASET_NAMES:
@@ -31,10 +47,20 @@ for dataset in DATASET_NAMES:
     pn_config[f"flows/{dataset}"] = os.path.abspath(f)
 pywrdrb.load_pn_config(pn_config)
 
+# Split the dataset names across ranks
+if USE_MPI:
+    local_rank_datasets = [
+        dataset for i, dataset in enumerate(DATASET_NAMES) if i % size == rank
+    ]
+else:
+    local_rank_datasets = DATASET_NAMES
+
 
 if __name__ == "__main__":
 
-    for dataset in DATASET_NAMES[:3]:
+    print(f"Rank {rank} preparing {len(local_rank_datasets)} datasets for Pywr-DRB...")
+
+    for dataset in local_rank_datasets:
 
         ## Calculate catchment inflows
         if REDO_INFLOW_CALCULATION:

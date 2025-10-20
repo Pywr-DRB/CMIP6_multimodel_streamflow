@@ -1,9 +1,23 @@
 
 import os
+import numpy as np
 import pandas as pd
 import pywrdrb
-
+from mpi4py import MPI
 from config import DATASET_NAMES
+
+
+USE_MPI = True
+if USE_MPI:
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    print(f"MPI enabled: rank {rank} of {size}")
+else:
+    comm = None
+    rank = 0
+    size = 1
+    print("MPI not enabled.")
 
 
 # Setup pathnavigator
@@ -14,13 +28,28 @@ for dataset in DATASET_NAMES:
 pywrdrb.load_pn_config(pn_config)
 
 
+# Split the dataset names across ranks
+if USE_MPI:
+    local_rank_datasets = [
+        dataset for i, dataset in enumerate(DATASET_NAMES) if i % size == rank
+    ]
+else:
+    local_rank_datasets = DATASET_NAMES
+
+
 if __name__ == "__main__":
 
-    for dataset in DATASET_NAMES[:3]:
+    print(f"Rank {rank} running {len(local_rank_datasets)} datasets through Pywr-DRB...")
+
+    for dataset in local_rank_datasets:
 
         ## Filenames
         model_json_file = f"pywrdrb/json/{dataset}.json"
         model_output_file = f"pywrdrb/outputs/{dataset}.hdf5"
+        
+        # Make the json and output directories if they don't exist
+        os.makedirs(os.path.dirname(model_json_file), exist_ok=True)
+        os.makedirs(os.path.dirname(model_output_file), exist_ok=True)
         
         # Get the start and end dates
         f = f"pywrdrb/inputs/{dataset}/gage_flow_mgd.csv"
@@ -65,8 +94,6 @@ if __name__ == "__main__":
         
         ### Run
         model.run()
-        print("#" * 50)
-        print(f"DONE with Pywr-DRB simulation for {dataset}...")
-        print("#" * 50)
-    
-    print(f"Done running Pywr-DRB simulations.")
+
+
+    print(f"Rank {rank} done running Pywr-DRB simulations.")

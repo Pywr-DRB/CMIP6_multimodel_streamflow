@@ -7,10 +7,14 @@ __pycache__/
 /netcdf/*
 logs/
 pywrdrb/inputs/*/predicted_inflows_mgd.csv
+pywrdrb/inputs/*/predicted_diversions_mgd.csv
 pywrdrb/inputs/*/diversion_nyc_extrapolated_mgd.csv
 pywrdrb/inputs/*/diversion_nj_extrapolated_mgd.csv
+pywrdrb/inputs/*/figures/*
+
 
 pywrdrb/outputs/*
+pywrdrb/json/*
 pywrdrb/models/*
 figures/*
 /stats/
