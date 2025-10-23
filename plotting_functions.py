@@ -356,3 +356,103 @@ def plot_monthly_stat_panel_by_ssp_and_start_year(df, datasets,
         plt.savefig(fname)
     plt.close()
     return axs
+
+def plot_quantile_space_with_selected_scenarios(quantile_matrix,
+                                                 selected_scenarios_df,
+                                                 node,
+                                                 fname):
+    """
+    Create quantile space heatmap with selected GCM scenarios overlaid.
+
+    This visualization shows:
+    1. Background: Heatmap of quantile matrix showing flow changes across quantile space
+    2. Overlay: Three selected scenarios (low, medium, high) as traces through quantile space
+
+    Parameters:
+    -----------
+    quantile_matrix : np.ndarray
+        Shape (12, 100) - quantile values for each month
+    selected_scenarios_df : pd.DataFrame
+        Rows = months (1-12), Columns = scenario types (low, medium, high), Values = flow change (%)
+    node : str
+        Node name for labeling
+    fname : str
+        Output filename for the plot
+    """
+    from quantile_utils import get_scenario_quantile_trajectory
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    # Create heatmap background showing flow change values
+    heatmap_data = quantile_matrix.T  # Shape: (100, 12)
+
+    # Plot heatmap with diverging colormap centered at 0
+    norm = TwoSlopeNorm(vmin=heatmap_data.min(), vcenter=0, vmax=heatmap_data.max())
+    im = ax.imshow(heatmap_data, aspect='auto', origin='lower',
+                   cmap='RdBu', norm=norm,
+                   interpolation='bilinear',
+                   extent=[0, 12, 0, 100])
+
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax, label='Flow Change (%)', pad=0.02)
+
+    # Define colors for scenario types
+    scenario_colors = {
+        'low': '#2166ac',      # blue
+        'medium': '#fee090',   # yellow
+        'high': '#b2182b'      # red
+    }
+
+    # Plot each selected scenario
+    for scenario_type in selected_scenarios_df.columns:
+        # Get flow values for this scenario
+        flow_values = selected_scenarios_df[scenario_type].values
+
+        # Convert to quantile trajectory
+        quantile_trajectory = get_scenario_quantile_trajectory(flow_values, quantile_matrix)
+
+        # Plot the trajectory
+        months_plot = np.arange(0, 12)
+        color = scenario_colors.get(scenario_type, 'gray')
+
+        ax.plot(months_plot, quantile_trajectory,
+                color=color, linewidth=3.5,
+                alpha=0.9, zorder=10,
+                label=f'{scenario_type.capitalize()} scenario')
+
+        # Add markers at key months (Jan, Jun, Dec)
+        key_months_indices = [0, 5, 11]  # Jan, Jun, Dec
+        ax.scatter([months_plot[m] for m in key_months_indices],
+                  [quantile_trajectory[m] for m in key_months_indices],
+                  color=color, s=150, zorder=11,
+                  edgecolors='white', linewidths=2)
+
+    # Customize axes
+    ax.set_xlabel('Month', fontsize=13, fontweight='bold')
+    ax.set_ylabel('Quantile (%)', fontsize=13, fontweight='bold')
+    ax.set_title(f'{node.replace("_", " ").title()} - Selected Climate Scenarios in Quantile Space\n' +
+                 'Representative GCM Projections Spanning Low, Medium, and High Futures',
+                 fontsize=14, fontweight='bold', pad=20)
+
+    # Set x-axis ticks and labels
+    month_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    ax.set_xticks(range(12))
+    ax.set_xticklabels(month_labels, fontsize=10)
+
+    # Set y-axis ticks
+    ax.set_yticks([0, 10, 25, 50, 75, 90, 100])
+    ax.set_ylim(0, 100)
+    ax.set_xlim(0, 11)
+
+    # Add grid
+    ax.grid(True, alpha=0.3, linestyle=':', color='white', linewidth=0.5, zorder=5)
+
+    # Legend
+    ax.legend(loc='upper left', fontsize=11,
+             framealpha=0.95, edgecolor='black')
+
+    # Save figure
+    plt.tight_layout()
+    plt.savefig(fname, dpi=300, bbox_inches='tight')
+    plt.close()

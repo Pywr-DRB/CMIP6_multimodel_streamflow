@@ -37,6 +37,20 @@ This workflow requires pywrdrb>=2.1.0.
 
 
 
-> All of the scripts titled `S*_` are being used by Trevor to determine a subset of climate scenarios and should be considered under development. 
+> All of the scripts titled `S*_` are being used by Trevor to determine a subset of climate scenarios and should be considered under development.
+
+
+## Climate Scenario Selection Scripts
+
+The following scripts are used to analyze CMIP6 climate projections and select representative scenarios for Pywr-DRB simulations:
+
+`S1_compare_historic_data.py`
+    Compares historic streamflow from PRMS and VIC hydrologic models against observed data (pub_nhmv10_BC_withObsScaled) using statistical metrics including Nash-Sutcliffe Efficiency, percent bias, monthly correlation coefficients, and seasonal timing analysis. This analysis determines which hydrologic model better reproduces historic flow patterns for NYC aggregate inflows.
+
+`S2_calculate_annual_monthly_stats.py`
+    Calculates annual and monthly statistics (means, standard deviations) for all CMIP6 datasets at specified nodes. Computes percentage changes relative to both dataset-specific baselines and the reconstruction baseline. Outputs are saved to CSV files in the `stats/` directory for use in downstream analysis and scenario selection.
+
+`S3_find_scenarios.py`
+    Simplified approach to select representative climate scenarios. Filters CMIP6 scenarios using IQR method to remove outliers, calculates weighted average streamflow changes across all months, and selects three representative scenarios (low, medium, high) based on ranked weighted averages. Provides a straightforward alternative to the quantile interpolation approach in S3.
 
 

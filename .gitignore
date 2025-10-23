@@ -18,3 +18,6 @@ pywrdrb/json/*
 pywrdrb/models/*
 figures/*
 /stats/
+archive/*
+
+METHODS.md

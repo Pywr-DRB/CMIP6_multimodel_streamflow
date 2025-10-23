@@ -369,20 +369,6 @@ def main():
     print(f"Weight scheme: Equal weights for all 12 months")
     
     weights = None  # Equal weights
-    weights = np.array([
-        0.5,  # Jan
-        0.50,  # Feb
-        0.10,  # Mar
-        0.10,  # Apr
-        0.10,  # May
-        0.50,  # Jun
-        0.50,  # Jul
-        0.50,  # Aug
-        0.10,  # Sep
-        0.10,  # Oct
-        0.10,  # Nov
-        0.50   # Dec
-    ])
     weighted_averages = calculate_weighted_average_change(df_filtered, weights=weights)
     
     print(f"\nWeighted average statistics:")
@@ -406,8 +392,13 @@ def main():
         print(f"  Percentile:      {info['percentile']:.0f}th")
     
     # Step 4: Save results
-    output_dir = f'{fdir}/selected_scenarios'
-    os.makedirs(output_dir, exist_ok=True)
+    # CSV outputs go to stats folder
+    stats_output_dir = f'{fdir}/selected_scenarios'
+    os.makedirs(stats_output_dir, exist_ok=True)
+
+    # Figure outputs go to figures folder
+    figures_output_dir = './figures/diff_relative_to_dataset_baseline/selected_scenarios' if use_dataset_baseline else './figures/diff_relative_to_reconstruction/selected_scenarios'
+    os.makedirs(figures_output_dir, exist_ok=True)
     
     # Save selected scenario traces
     selected_traces = {}
@@ -416,12 +407,12 @@ def main():
     
     selected_traces_df = pd.DataFrame(selected_traces)
     selected_traces_df.index.name = 'month'
-    
-    fname = f'{output_dir}/{node}_selected_scenarios_{hydro_model_source}_{ssp_period}.csv'
+
+    fname = f'{stats_output_dir}/{node}_selected_scenarios_{hydro_model_source}_{ssp_period}.csv'
     selected_traces_df.to_csv(fname)
     print(f"\n{'='*80}")
     print(f"Selected scenario traces saved: {fname}")
-    
+
     # Save summary info
     summary_data = []
     for scenario_type, info in selected_scenarios.items():
@@ -433,27 +424,27 @@ def main():
             'total_scenarios': len(weighted_averages),
             'percentile': info['percentile']
         })
-    
+
     summary_df = pd.DataFrame(summary_data)
-    fname = f'{output_dir}/{node}_selection_summary_{hydro_model_source}_{ssp_period}.csv'
+    fname = f'{stats_output_dir}/{node}_selection_summary_{hydro_model_source}_{ssp_period}.csv'
     summary_df.to_csv(fname, index=False)
     print(f"Selection summary saved: {fname}")
-    
+
     # Save all weighted averages for reference
-    fname = f'{output_dir}/{node}_all_weighted_averages_{hydro_model_source}_{ssp_period}.csv'
+    fname = f'{stats_output_dir}/{node}_all_weighted_averages_{hydro_model_source}_{ssp_period}.csv'
     weighted_averages.to_csv(fname, header=['weighted_avg_change'])
     print(f"All weighted averages saved: {fname}")
-    
+
     # Step 5: Create visualizations
     print(f"\n{'='*80}")
     print(f"CREATING VISUALIZATIONS")
     print(f"{'='*80}")
-    
+
     plot_scenario_selection(df_filtered, weighted_averages, selected_scenarios,
-                           node, output_dir, hydro_model_source, ssp_period)
-    
-    plot_rank_distribution(weighted_averages, selected_scenarios, 
-                          node, output_dir, hydro_model_source, ssp_period)
+                           node, figures_output_dir, hydro_model_source, ssp_period)
+
+    plot_rank_distribution(weighted_averages, selected_scenarios,
+                          node, figures_output_dir, hydro_model_source, ssp_period)
     
     print(f"\n{'='*80}")
     print(f"ANALYSIS COMPLETE")
