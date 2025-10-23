@@ -73,7 +73,7 @@ if __name__ == "__main__":
             start_date=start_date,
             end_date=end_date,
             options = {
-                'nyc_nj_demand_source':'custom'
+                'nyc_nj_demand_source':'custom' # [historic, custom, constant]
             }
         )
         

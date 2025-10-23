@@ -33,3 +33,5 @@ for dataset in DATASET_NAMES:
         DATASET_COLORS_BY_PERIOD[dataset] = 'orange'
     elif '2060_2099' in dataset:
         DATASET_COLORS_BY_PERIOD[dataset] = 'red'
+
+

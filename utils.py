@@ -176,7 +176,6 @@ def get_dataset_baseline(dataset):
     elif settings['hydrology_model'] == 'VIC5':
         if 'Livneh' in settings['forcing']:
             return 'VIC5_RAPID_Livneh2018_v20200704L_1950_2013'
-        
         elif 'Daymet' in settings['forcing']:
             return 'VIC5_RAPID_Daymet2019_v20200704D_1980_2019'
         else:

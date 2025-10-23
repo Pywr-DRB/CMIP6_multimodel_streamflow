@@ -13,7 +13,6 @@ from plotting_functions import plot_monthly_stat_lines
 
 # pywrdrb_nodes list or subset of nodes to plot
 CONSIDER_NODES = [
-    'delMontague',
     'nyc_inflow'
 ]
 

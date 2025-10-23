@@ -3,13 +3,12 @@ import os
 import numpy as np
 import pandas as pd
 import pywrdrb
-from config import DATASET_NAMES
+from config import DATASET_NAMES 
 from utils import dataset_baselines
 
 
 # pywrdrb_nodes list or subset of nodes to plot
 CONSIDER_NODES = [
-    'delMontague',
     'nyc_inflow'
 ]
 
@@ -34,7 +33,6 @@ if __name__ == "__main__":
     flowtypes = flowtype_opts
     data = pywrdrb.Data(results_sets=results_sets,)
     data.load_hydrologic_model_flow(flowtypes)
-    data.load_observations()
     
     # The data object will contain the gage_flow_mgd DataFrames for each flowtype
     loaded_datasets = data.major_flow.keys()
@@ -80,20 +78,15 @@ if __name__ == "__main__":
         node_flows = pd.DataFrame(node_flows)
         node_flows.index = pd.to_datetime(node_flows.index)
         
-        # for historic datasets, only use data from 1983-10-01 to 2016-12-31
-        if node in historic_datasets:
-            node_flows = node_flows.loc['1980-10-01':'2016-12-31', :]
-        
-        # for all columns, replace 0.0 with NaN
-        node_flows.replace(0.0, np.nan, inplace=True)  # Replace 0.0 with NaN for statistics calculation
-
         # Make monthly flow df
         monthly = node_flows.groupby([node_flows.index.year, node_flows.index.month]).sum()
         monthly.index = pd.MultiIndex.from_tuples(monthly.index, names=['year', 'month'])
-        monthly.replace(0.0, np.nan, inplace=True)  # Replace 0.0 with NaN for statistics calculation
 
         annual = node_flows.groupby(node_flows.index.year).sum()
-        annual.replace(0.0, np.nan, inplace=True)  # Replace 0.0 with NaN for statistics calculation
+        
+        # Replace 0.0 with NaN after aggregations for statistics calculation
+        monthly.replace(0.0, np.nan, inplace=True)
+        annual.replace(0.0, np.nan, inplace=True)
         annual_median = np.nanmedian(annual, axis=0)
         annual_median = pd.Series(annual_median, index=annual.columns, name='median')
         annual_means = annual.mean()
@@ -139,6 +132,11 @@ if __name__ == "__main__":
                 else:
                     # Use the reconstruction as baseline
                     baseline = 'pub_nhmv10_BC_withObsScaled'
+            
+                # Check if baseline exists in the data
+                if baseline not in monthly_means.columns:
+                    print(f"Warning: Baseline '{baseline}' not found for dataset '{dataset}'. Skipping.")
+                    continue
             
                 baseline_means = monthly_means[baseline]
                 baseline_stds = monthly_stds[baseline]
