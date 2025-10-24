@@ -19,5 +19,6 @@ pywrdrb/models/*
 figures/*
 /stats/
 archive/*
+.claude/
 
 METHODS.md

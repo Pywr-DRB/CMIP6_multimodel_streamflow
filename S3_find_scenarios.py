@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
+from scenario_utils import filter_scenarios_by_annual_change, calculate_flow_weights
 
 
 
@@ -186,93 +187,72 @@ def select_representative_scenarios(weighted_averages, n_scenarios=3):
     return selected
 
 
-def plot_scenario_selection(df_filtered, weighted_averages, selected_scenarios, 
+def plot_scenario_selection(df_filtered, weighted_averages, selected_scenarios,
                             node, output_dir, hydro_model, ssp_period):
     """
-    Create comprehensive visualization of scenario selection process.
-    
-    Creates a multi-panel figure showing:
-    - Distribution of weighted averages with selected scenarios
-    - Monthly patterns for selected scenarios
-    - Comparison of all scenarios vs selected ones
+    Create two-panel visualization of scenario selection process.
+
+    Creates a figure showing:
+    - Panel 1: Distribution of weighted averages with selected scenarios highlighted
+    - Panel 2: Selected scenarios in context of full ensemble range
     """
-    fig = plt.figure(figsize=(16, 10))
-    gs = fig.add_gridspec(3, 3, hspace=0.35, wspace=0.35)
-    
+    fig = plt.figure(figsize=(16, 6))
+    gs = fig.add_gridspec(1, 2, hspace=0.3, wspace=0.3)
+
     colors = {'low': '#2166ac', 'medium': '#fee090', 'high': '#b2182b'}
-    
+    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
     # Panel 1: Histogram of weighted averages
-    ax1 = fig.add_subplot(gs[0, :])
+    ax1 = fig.add_subplot(gs[0])
     ax1.hist(weighted_averages.values, bins=30, alpha=0.7, color='gray', edgecolor='black')
-    
+
     # Mark selected scenarios
     for scenario_type, info in selected_scenarios.items():
-        ax1.axvline(info['weighted_avg'], color=colors[scenario_type], 
-                   linewidth=2.5, linestyle='--', 
+        ax1.axvline(info['weighted_avg'], color=colors[scenario_type],
+                   linewidth=2.5, linestyle='--',
                    label=f"{scenario_type.capitalize()}: {info['weighted_avg']:.1f}%")
-    
+
     ax1.set_xlabel('Weighted Average Flow Change (%)', fontsize=12, fontweight='bold')
     ax1.set_ylabel('Number of Scenarios', fontsize=12, fontweight='bold')
-    ax1.set_title(f'(a) Distribution of Weighted Average Changes - {len(weighted_averages)} Scenarios', 
+    ax1.set_title(f'(a) Distribution of Weighted Average Changes\n{len(weighted_averages)} Scenarios',
                   fontsize=13, fontweight='bold', loc='left')
     ax1.legend(fontsize=10, loc='upper right')
     ax1.grid(True, alpha=0.3)
-    
-    # Panel 2: Monthly patterns for selected scenarios
-    ax2 = fig.add_subplot(gs[1, :])
-    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    
-    for scenario_type, info in selected_scenarios.items():
-        scenario_name = info['name']
-        values = df_filtered[scenario_name].values
-        ax2.plot(range(1, 13), values, marker='o', linewidth=2.5, 
-                markersize=8, label=f"{scenario_type.capitalize()}: {scenario_name}", 
-                color=colors[scenario_type])
-    
-    ax2.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
-    ax2.set_xlabel('Month', fontsize=12, fontweight='bold')
-    ax2.set_ylabel('Flow Change (%)', fontsize=12, fontweight='bold')
-    ax2.set_title('(b) Monthly Flow Change Patterns for Selected Scenarios', 
-                  fontsize=13, fontweight='bold', loc='left')
-    ax2.set_xticks(range(1, 13))
-    ax2.set_xticklabels(month_names)
-    ax2.legend(fontsize=9, loc='best')
-    ax2.grid(True, alpha=0.3)
-    
-    # Panel 3: All scenarios envelope with selected overlaid
-    ax3 = fig.add_subplot(gs[2, :])
-    
+
+    # Panel 2: All scenarios envelope with selected overlaid
+    ax2 = fig.add_subplot(gs[1])
+
     # Plot envelope of all filtered scenarios
     all_min = df_filtered.min(axis=1)
     all_max = df_filtered.max(axis=1)
     all_mean = df_filtered.mean(axis=1)
-    
-    ax3.fill_between(range(1, 13), all_min.values, all_max.values, 
+
+    ax2.fill_between(range(1, 13), all_min.values, all_max.values,
                      alpha=0.3, color='gray', label='Full range (all filtered scenarios)')
-    ax3.plot(range(1, 13), all_mean.values, 'k--', linewidth=2, 
+    ax2.plot(range(1, 13), all_mean.values, 'k--', linewidth=2,
             label='Mean of all scenarios', alpha=0.7)
-    
+
     # Overlay selected scenarios
     for scenario_type, info in selected_scenarios.items():
         scenario_name = info['name']
         values = df_filtered[scenario_name].values
-        ax3.plot(range(1, 13), values, marker='o', linewidth=3, 
-                markersize=9, label=f"{scenario_type.capitalize()} (selected)", 
+        ax2.plot(range(1, 13), values, marker='o', linewidth=3,
+                markersize=9, label=f"{scenario_type.capitalize()} (selected)",
                 color=colors[scenario_type])
-    
-    ax3.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
-    ax3.set_xlabel('Month', fontsize=12, fontweight='bold')
-    ax3.set_ylabel('Flow Change (%)', fontsize=12, fontweight='bold')
-    ax3.set_title('(c) Selected Scenarios in Context of Full Ensemble', 
+
+    ax2.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
+    ax2.set_xlabel('Month', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('Flow Change (%)', fontsize=12, fontweight='bold')
+    ax2.set_title('(b) Selected Scenarios in Context of Full Ensemble',
                   fontsize=13, fontweight='bold', loc='left')
-    ax3.set_xticks(range(1, 13))
-    ax3.set_xticklabels(month_names)
-    ax3.legend(fontsize=9, loc='best', ncol=2)
-    ax3.grid(True, alpha=0.3)
-    
-    fig.suptitle(f'Scenario Selection: {node} | {hydro_model} | {ssp_period}', 
-                 fontsize=15, fontweight='bold', y=0.995)
-    
+    ax2.set_xticks(range(1, 13))
+    ax2.set_xticklabels(month_names)
+    ax2.legend(fontsize=9, loc='best', ncol=2)
+    ax2.grid(True, alpha=0.3)
+
+    fig.suptitle(f'Scenario Selection: {node} | {hydro_model} | {ssp_period}',
+                 fontsize=15, fontweight='bold', y=1.02)
+
     # Save figure
     fname = f'{output_dir}/{node}_scenario_selection_{hydro_model}_{ssp_period}.png'
     plt.savefig(fname, dpi=300, bbox_inches='tight')
@@ -335,7 +315,18 @@ def main():
     use_dataset_baseline = True
     hydro_model_source = 'PRMS'  # 'PRMS' or 'VIC' - based on S1 analysis, PRMS is better
     ssp_period = '2020_2059'  # or '2060_2099'
-    
+
+    # Weighting scheme: 'equal', 'flow_weighted', or 'log_flow_weighted'
+    # 'equal': All months weighted equally
+    # 'flow_weighted': Months weighted by their percentage of annual flow
+    # 'log_flow_weighted': Log-transformed flow percentages (reduces dominance of high-flow months)
+    weight_scheme = 'equal'  # 'flow_weighted' or 'log_flow_weighted' 
+
+    # Filter out scenarios with negative annual flow changes
+    # True: Only include scenarios with positive annual flow changes (consistent with climate projection literature)
+    # False: Include all scenarios regardless of annual flow change direction
+    require_positive_annual_change = True
+
     # Load data
     fdir = './stats/diff_relative_to_dataset_baseline' if use_dataset_baseline else './stats/diff_relative_to_reconstruction'
     monthly_prc_change = pd.read_csv(f'{fdir}/{node}_monthly_mean_prc_change_by_dataset_ssp_and_period.csv', index_col=0)
@@ -361,14 +352,55 @@ def main():
     
     # Step 1: Filter using IQR
     df_filtered, rejected = filter_scenarios_by_iqr(df, outlier_threshold=1.5, verbose=True)
-    
-    # Step 2: Calculate weighted averages (equal weights to start)
+
+    # Step 1b: Filter scenarios with negative annual flow changes (if enabled)
+    if require_positive_annual_change:
+        print(f"\n{'='*80}")
+        print(f"FILTERING BY ANNUAL FLOW CHANGE DIRECTION")
+        print(f"{'='*80}")
+
+        # Load monthly means to calculate annual changes
+        monthly_means_file = f'./stats/datasets_{node}_monthly_means.csv'
+        monthly_means = pd.read_csv(monthly_means_file, index_col=0)
+
+        # Use utility function to filter by annual change
+        df_filtered, scenarios_rejected_annual = filter_scenarios_by_annual_change(
+            df_filtered, monthly_means, require_positive=True, verbose=True
+        )
+
+        print(f"{'='*80}")
+
+    # Step 2: Calculate weighted averages
     print(f"\n{'='*80}")
     print(f"CALCULATING WEIGHTED AVERAGES")
     print(f"{'='*80}")
-    print(f"Weight scheme: Equal weights for all 12 months")
-    
-    weights = None  # Equal weights
+
+    if weight_scheme in ['flow_weighted', 'log_flow_weighted']:
+        # Load monthly means if not already loaded
+        if 'monthly_means' not in locals():
+            monthly_means_file = f'./stats/datasets_{node}_monthly_means.csv'
+            monthly_means = pd.read_csv(monthly_means_file, index_col=0)
+
+        # Use utility function to calculate flow weights
+        use_log_transform = (weight_scheme == 'log_flow_weighted')
+        weights, baseline_col = calculate_flow_weights(
+            monthly_means,
+            baseline_col='pub_nhmv10_BC_withObsScaled',
+            log_transform=use_log_transform
+        )
+
+        scheme_name = 'Log-flow-weighted' if use_log_transform else 'Flow-weighted'
+        print(f"Weight scheme: {scheme_name} (based on {baseline_col})")
+        print(f"\nMonthly weights:")
+        month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        for month, weight in zip(month_names, weights):
+            print(f"  {month}: {weight:6.4f} ({weight*100:5.2f}%)")
+    else:
+        # Equal weights
+        weights = None
+        print(f"Weight scheme: Equal weights for all 12 months")
+
     weighted_averages = calculate_weighted_average_change(df_filtered, weights=weights)
     
     print(f"\nWeighted average statistics:")
