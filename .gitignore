@@ -18,7 +18,7 @@ pywrdrb/json/*
 pywrdrb/models/*
 figures/*
 /stats/
-archive/*
+/archive/*
 .claude/
 
 METHODS.md
