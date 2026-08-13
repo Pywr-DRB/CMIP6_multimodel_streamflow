@@ -159,12 +159,6 @@ def select_representative_scenarios(weighted_averages, n_scenarios=3):
                 'rank': 1,
                 'percentile': 0
             },
-            'medium': {
-                'name': weighted_averages.index[med_idx],
-                'weighted_avg': weighted_averages.iloc[med_idx],
-                'rank': med_idx + 1,
-                'percentile': 50
-            },
             'high': {
                 'name': weighted_averages.index[high_idx],
                 'weighted_avg': weighted_averages.iloc[high_idx],

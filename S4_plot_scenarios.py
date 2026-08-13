@@ -1,14 +1,9 @@
 """
-Script for creating comprehensive visualizations of selected climate scenarios.
+Script for creating a comprehensive visualization of selected climate scenarios.
 
 This script loads the scenarios selected by S3_find_scenarios.py and creates
-multiple visualization types including:
-1. Quantile space heatmaps with selected scenario traces
-2. Monthly flow change comparisons
-3. Scenario envelope plots
-
-The quantile space visualization shows how the three selected scenarios
-(low, medium, high) traverse through the distribution of all GCM projections.
+a two-panel synthesis figure showing ranked annual flow changes and monthly
+flow change patterns.
 """
 
 import os
@@ -16,110 +11,58 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from quantile_utils import create_quantile_matrix
-from plotting_functions import plot_quantile_space_with_selected_scenarios
 from scenario_utils import calculate_flow_weights, calculate_weighted_average_changes
 
 
-def plot_scenario_monthly_comparison(selected_scenarios_df,
-                                      all_scenarios_df,
-                                      node,
-                                      hydro_model,
-                                      ssp_period,
-                                      output_dir):
+# =============================================================================
+# Module-level style dictionaries for consistent formatting across all figures
+# =============================================================================
+
+
+
+SCENARIO_LABELS = {
+    'low': 'Wetter Winter, Drier Summer',
+    'medium': 'Median',
+    'high': 'Wetter Winter',
+    'historic': 'Historic Baseline'
+}
+
+ENSEMBLE_LABEL = 'Range of PRMS SSP2 RCP4.5 CMIP6 Models'
+
+MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+SCENARIO_COLORS = {
+    'low': '#ed9f1c',      # Red
+    'medium': '#fee090',   # Yellow
+    'high': '#009e73',     # Blue
+    'historic': '#000000'  # Black
+}
+
+def plot_selected_scenarios(selected_scenarios_df,
+                            all_scenarios_df,
+                            all_scenarios_unfiltered_df,
+                            monthly_means_df,
+                            node,
+                            hydro_model,
+                            ssp_period,
+                            output_dir,
+                            weight_scheme='equal',
+                            scenarios_to_show=None):
     """
-    Create a plot comparing selected scenarios to the full ensemble.
-
-    Parameters:
-    -----------
-    selected_scenarios_df : pd.DataFrame
-        Selected scenarios (columns: low, medium, high)
-    all_scenarios_df : pd.DataFrame
-        All filtered scenarios from S3
-    node : str
-        Node name
-    hydro_model : str
-        Hydrologic model name (PRMS or VIC)
-    ssp_period : str
-        SSP period (e.g., '2020_2059')
-    output_dir : str
-        Output directory for figure
-    """
-    fig, ax = plt.subplots(figsize=(12, 7))
-
-    # Plot envelope of all scenarios
-    all_min = all_scenarios_df.min(axis=1)
-    all_max = all_scenarios_df.max(axis=1)
-    all_median = all_scenarios_df.median(axis=1)
-
-    ax.fill_between(all_scenarios_df.index, all_min, all_max,
-                    alpha=0.2, color='gray', label='Full ensemble range')
-    ax.plot(all_scenarios_df.index, all_median, 'k--',
-            linewidth=2, label='Ensemble median', alpha=0.7)
-
-    # Plot selected scenarios
-    scenario_colors = {
-        'low': '#2166ac',
-        'medium': '#fee090',
-        'high': '#b2182b'
-    }
-
-    for scenario_type in selected_scenarios_df.columns:
-        color = scenario_colors.get(scenario_type, 'gray')
-        ax.plot(selected_scenarios_df.index,
-                selected_scenarios_df[scenario_type],
-                color=color, linewidth=3, marker='o', markersize=6,
-                label=f'{scenario_type.capitalize()} scenario',
-                zorder=10)
-
-    # Styling
-    ax.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
-    ax.set_xlabel('Month', fontsize=12, fontweight='bold')
-    ax.set_ylabel('Flow Change (%) Relative to Baseline', fontsize=12, fontweight='bold')
-    ax.set_title(f'{node.replace("_", " ").title()} - Selected Scenarios vs Full Ensemble\n' +
-                 f'{hydro_model} | {ssp_period.replace("_", "-")}',
-                 fontsize=14, fontweight='bold')
-
-    # Month labels
-    month_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    ax.set_xticks(range(1, 13))
-    ax.set_xticklabels(month_labels)
-
-    ax.legend(fontsize=10, loc='best')
-    ax.grid(True, alpha=0.3)
-
-    # Save
-    fname = f'{output_dir}/{node}_selected_vs_ensemble_{hydro_model}_{ssp_period}.png'
-    plt.tight_layout()
-    plt.savefig(fname, dpi=300, bbox_inches='tight')
-    plt.close()
-
-    print(f"Saved: {fname}")
-
-
-def plot_comprehensive_synthesis(selected_scenarios_df,
-                                  all_scenarios_df,
-                                  monthly_means_df,
-                                  node,
-                                  hydro_model,
-                                  ssp_period,
-                                  output_dir,
-                                  weight_scheme='equal'):
-    """
-    Create a comprehensive three-panel synthesis figure showing:
-    - Panel 1: Distribution of weighted average annual flow changes with selected scenarios
-    - Panel 2: Selected scenarios in context of full ensemble (monthly % changes)
-    - Panel 3: Absolute monthly flows (PUB baseline + climate-adjusted scenarios)
+    Create a two-panel figure showing selected climate scenarios:
+    - Panel a: Rank vs magnitude plot of weighted average annual flow changes
+    - Panel b: Selected scenarios in context of full ensemble (monthly % changes)
 
     Parameters:
     -----------
     selected_scenarios_df : pd.DataFrame
         Selected scenarios (columns: low, medium, high) with monthly % changes
     all_scenarios_df : pd.DataFrame
-        All filtered scenarios from S3 with monthly % changes
+        All filtered scenarios from S3 (post-IQR filtering) with monthly % changes
+    all_scenarios_unfiltered_df : pd.DataFrame
+        All scenarios before IQR filtering (pre-IQR) for full ensemble shading
     monthly_means_df : pd.DataFrame
-        Monthly mean flows (rows=months, columns=datasets) for absolute values
+        Monthly mean flows (rows=months, columns=datasets)
     node : str
         Node name
     hydro_model : str
@@ -130,15 +73,13 @@ def plot_comprehensive_synthesis(selected_scenarios_df,
         Output directory for figure
     weight_scheme : str
         Weighting scheme used in S3 ('equal', 'flow_weighted', or 'log_flow_weighted')
+    scenarios_to_show : list or None
+        List of scenario types to display (e.g., ['low', 'medium', 'high']).
+        If None, defaults to all scenarios in selected_scenarios_df.
     """
-    # Shared color scheme
-    scenario_colors = {
-        'low': '#2166ac',
-        'medium': '#fee090',
-        'high': '#b2182b'
-    }
-    month_labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    # Default to showing all selected scenarios
+    if scenarios_to_show is None:
+        scenarios_to_show = list(selected_scenarios_df.columns)
 
     # Calculate weights based on scheme
     if weight_scheme in ['flow_weighted', 'log_flow_weighted']:
@@ -149,125 +90,115 @@ def plot_comprehensive_synthesis(selected_scenarios_df,
     else:
         weights = None
 
-    # Calculate weighted average changes for all scenarios
-    weighted_averages = calculate_weighted_average_changes(all_scenarios_df, weights=weights)
+    # Calculate weighted average changes for both filtered and unfiltered scenarios
+    weighted_averages_filtered = calculate_weighted_average_changes(all_scenarios_df, weights=weights)
+    weighted_averages_unfiltered = calculate_weighted_average_changes(all_scenarios_unfiltered_df, weights=weights)
 
     # Get weighted averages for selected scenarios
     selected_weighted_avgs = {}
     for scenario_type in selected_scenarios_df.columns:
-        # Find the GCM name from the selected scenarios
         scenario_monthly = selected_scenarios_df[scenario_type]
-        # Match to the GCM in all_scenarios_df
         for gcm_name in all_scenarios_df.columns:
             if np.allclose(all_scenarios_df[gcm_name].values, scenario_monthly.values):
-                selected_weighted_avgs[scenario_type] = weighted_averages[gcm_name]
+                selected_weighted_avgs[scenario_type] = weighted_averages_filtered[gcm_name]
                 break
 
-    # Create figure with 3 panels
-    fig = plt.figure(figsize=(18, 6))
-    gs = fig.add_gridspec(1, 3, wspace=0.3)
+    # =========================================================================
+    # Consistent style settings for both panels
+    # =========================================================================
+    ENSEMBLE_COLOR = '#808080'
+    ENSEMBLE_ALPHA = 0.4
 
-    # ===== PANEL 1: Distribution of weighted average changes =====
-    ax1 = fig.add_subplot(gs[0])
+    # Create figure with 2 panels, width ratio 1:1.67
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5),
+                                    gridspec_kw={'width_ratios': [1, 1.67], 'wspace': 0.3})
 
-    ax1.hist(weighted_averages.values, bins=30, alpha=0.7,
-             color='gray', edgecolor='black', label='Ensemble')
+    # ===== PANEL a: Rank vs Magnitude plot =====
+    # Sort scenarios by weighted average change
+    sorted_averages = weighted_averages_unfiltered.sort_values()
+    ranks = np.arange(1, len(sorted_averages) + 1)
 
-    # Mark selected scenarios with vertical lines
-    for scenario_type, weighted_avg in selected_weighted_avgs.items():
-        ax1.axvline(weighted_avg, color=scenario_colors[scenario_type],
-                   linewidth=2.5, linestyle='--',
-                   label=f"{scenario_type.capitalize()}")
+    # Create line plot for ensemble
+    ax1.plot(ranks, sorted_averages.values, color=ENSEMBLE_COLOR, linewidth=2,
+             marker='o', markersize=6, alpha=0.7, label=ENSEMBLE_LABEL, zorder=1)
 
-    ax1.set_xlabel('Weighted Average Flow Change (%)', fontsize=11, fontweight='bold')
-    ax1.set_ylabel('Number of Scenarios', fontsize=11, fontweight='bold')
-    ax1.set_title('(a) Distribution of Weighted Average Changes',
-                  fontsize=12, fontweight='bold', loc='left')
-    ax1.grid(True, alpha=0.3)
+    # Highlight selected scenarios with colored markers
+    for scenario_name, rank in zip(sorted_averages.index, ranks):
+        for scenario_type in scenarios_to_show:
+            if scenario_type in selected_scenarios_df.columns:
+                scenario_monthly = selected_scenarios_df[scenario_type]
+                if scenario_name in all_scenarios_unfiltered_df.columns:
+                    if np.allclose(all_scenarios_unfiltered_df[scenario_name].values, scenario_monthly.values):
+                        ax1.plot(rank, sorted_averages[scenario_name],
+                                marker='o', markersize=10, color=SCENARIO_COLORS[scenario_type],
+                                zorder=10, label=SCENARIO_LABELS[scenario_type])
+                        break
 
-    # ===== PANEL 2: Monthly % changes (ensemble context) =====
-    ax2 = fig.add_subplot(gs[1])
+    # Add horizontal line at zero
+    ax1.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
 
-    # Plot envelope of all scenarios
-    all_min = all_scenarios_df.min(axis=1)
-    all_max = all_scenarios_df.max(axis=1)
-    all_median = all_scenarios_df.median(axis=1)
+    ax1.set_xlabel('Scenario Rank', fontsize=11)
+    ax1.set_ylabel('Change in Mean Annual Flow (%)', fontsize=11)
+    ax1.set_title('(a) Ranked Annual Flow Changes',
+                  fontsize=12, loc='left')
+    ax1.grid(True, alpha=0.3, axis='y')
 
-    ax2.fill_between(range(1, 13), all_min.values, all_max.values,
-                     alpha=0.2, color='gray', label='Ensemble range')
-    ax2.plot(range(1, 13), all_median, 'k--',
-            linewidth=2, label='Ensemble median', alpha=0.7)
+    # ===== PANEL b: Monthly % changes (ensemble context) =====
+    # Full ensemble range
+    unfiltered_min = all_scenarios_unfiltered_df.min(axis=1)
+    unfiltered_max = all_scenarios_unfiltered_df.max(axis=1)
+    ax2.fill_between(range(1, 13), unfiltered_min.values, unfiltered_max.values,
+                     alpha=ENSEMBLE_ALPHA, color=ENSEMBLE_COLOR,
+                     label=ENSEMBLE_LABEL)
 
-    # Overlay selected scenarios
-    for scenario_type in selected_scenarios_df.columns:
-        ax2.plot(range(1, 13), selected_scenarios_df[scenario_type].values,
-                marker='o', linewidth=3, markersize=6,
-                color=scenario_colors[scenario_type],
-                label=f"{scenario_type.capitalize()}")
+    # Overlay selected scenarios (only those in scenarios_to_show)
+    for scenario_type in scenarios_to_show:
+        if scenario_type in selected_scenarios_df.columns:
+            ax2.plot(range(1, 13), selected_scenarios_df[scenario_type].values,
+                    marker='o', linewidth=2.5, markersize=6,
+                    color=SCENARIO_COLORS[scenario_type],
+                    label=SCENARIO_LABELS[scenario_type])
 
     ax2.axhline(y=0, color='black', linestyle='-', linewidth=1, alpha=0.5)
-    ax2.set_xlabel('Month', fontsize=11, fontweight='bold')
-    ax2.set_ylabel('Flow Change (%) vs Baseline', fontsize=11, fontweight='bold')
+    ax2.set_xlabel('Month', fontsize=11)
+    ax2.set_ylabel('Change in Mean Monthly Flow (%)', fontsize=11)
     ax2.set_title('(b) Monthly Flow Changes',
-                  fontsize=12, fontweight='bold', loc='left')
+                  fontsize=12, loc='left')
     ax2.set_xticks(range(1, 13))
-    ax2.set_xticklabels(month_labels, rotation=45, ha='right')
-    ax2.grid(True, alpha=0.3)
+    ax2.set_xticklabels(MONTH_LABELS, rotation=45, ha='right')
+    ax2.grid(True, alpha=0.3, axis='y')
 
-    # ===== PANEL 3: Absolute monthly flows =====
-    ax3 = fig.add_subplot(gs[2])
-
-    # Get PUB baseline monthly flows
-    pub_baseline = monthly_means_df['pub_nhmv10_BC_withObsScaled'].values
-
-    # Plot PUB baseline
-    ax3.plot(range(1, 13), pub_baseline, 'k-', linewidth=3,
-            marker='s', markersize=7, label='Historic (PUB)', zorder=10)
-
-    # Plot climate-adjusted scenarios (PUB baseline * (1 + % change / 100))
-    for scenario_type in selected_scenarios_df.columns:
-        pct_changes = selected_scenarios_df[scenario_type].values
-        climate_adjusted = pub_baseline * (1 + pct_changes / 100)
-        ax3.plot(range(1, 13), climate_adjusted,
-                marker='o', linewidth=3, markersize=6,
-                color=scenario_colors[scenario_type],
-                label=f"{scenario_type.capitalize()} (future)")
-
-    ax3.set_xlabel('Month', fontsize=11, fontweight='bold')
-    ax3.set_ylabel('Monthly Mean Flow (cfs)', fontsize=11, fontweight='bold')
-    ax3.set_title('(c) Absolute Monthly Flows',
-                  fontsize=12, fontweight='bold', loc='left')
-    ax3.set_xticks(range(1, 13))
-    ax3.set_xticklabels(month_labels, rotation=45, ha='right')
-    ax3.grid(True, alpha=0.3)
-
-    # yscale log
-    ax3.set_yscale('log')
-
-    # ===== Single unified legend =====
-    # Collect all handles and labels from all three axes
+    # ===== Single unified legend below figure =====
+    # Collect handles and labels, using consistent naming
     handles1, labels1 = ax1.get_legend_handles_labels()
     handles2, labels2 = ax2.get_legend_handles_labels()
-    handles3, labels3 = ax3.get_legend_handles_labels()
 
-    # Create dictionary to deduplicate by label
+    # Build legend with consistent labels (no duplicates)
     legend_dict = {}
-    for h, l in zip(handles1 + handles2 + handles3, labels1 + labels2 + labels3):
+    for h, l in zip(handles1 + handles2, labels1 + labels2):
         if l not in legend_dict:
             legend_dict[l] = h
 
-    # Add legend to the figure (not individual axes)
-    fig.legend(legend_dict.values(), legend_dict.keys(),
-              loc='upper center', bbox_to_anchor=(0.5, -0.02),
-              ncol=7, fontsize=10, frameon=True)
+    # Order legend items: ensemble first, then scenarios
+    ordered_labels = []
+    ordered_handles = []
+    # Ensemble item first
+    if ENSEMBLE_LABEL in legend_dict:
+        ordered_labels.append(ENSEMBLE_LABEL)
+        ordered_handles.append(legend_dict[ENSEMBLE_LABEL])
+    # Then scenario items
+    for scenario_type in scenarios_to_show:
+        label = SCENARIO_LABELS.get(scenario_type, scenario_type)
+        if label in legend_dict:
+            ordered_labels.append(label)
+            ordered_handles.append(legend_dict[label])
 
-    # Overall title
-    fig.suptitle(f'{node.replace("_", " ").title()} - Comprehensive Scenario Synthesis | ' +
-                 f'{hydro_model} | {ssp_period.replace("_", "-")}',
-                 fontsize=14, fontweight='bold', y=1.00)
+    fig.legend(ordered_handles, ordered_labels,
+              loc='upper center', bbox_to_anchor=(0.5, -0.02),
+              ncol=len(ordered_labels), fontsize=10, frameon=True)
 
     # Save
-    fname = f'{output_dir}/{node}_comprehensive_synthesis_{hydro_model}_{ssp_period}.png'
+    fname = f'{output_dir}/{node}_selected_scenarios_{hydro_model}_{ssp_period}.png'
     plt.savefig(fname, dpi=300, bbox_inches='tight')
     plt.close()
 
@@ -322,63 +253,51 @@ def main():
                         and ('ssp245' in d or 'ssp370' in d)
                         and ssp_period in d]
 
-    all_scenarios_df = monthly_prc_change[filtered_datasets]
     print(f"Loaded {len(filtered_datasets)} GCM scenarios for comparison")
 
-    # Load monthly means for absolute flow values (Panel 3 of synthesis plot)
+    # Load monthly means for weight calculations
     monthly_means_file = f'./stats/datasets_{node}_monthly_means.csv'
     monthly_means_df = pd.read_csv(monthly_means_file, index_col=0)
     print(f"Loaded monthly means from: {monthly_means_file}")
 
-    # Create quantile matrix from all filtered scenarios
-    print(f"\nCreating quantile matrix...")
-    quantile_matrix = create_quantile_matrix(all_scenarios_df)
-    print(f"  Quantile matrix shape: {quantile_matrix.shape}")
+    # Load weighted averages to identify which scenarios passed IQR filtering
+    weighted_avgs_file = f'{stats_dir}/{node}_all_weighted_averages_{hydro_model_source}_{ssp_period}.csv'
+    weighted_avgs_df = pd.read_csv(weighted_avgs_file, index_col=0)
+    filtered_scenario_names = weighted_avgs_df.index.tolist()
 
-    # Create visualizations
+    # all_scenarios_unfiltered_df = all scenarios before IQR filtering
+    all_scenarios_unfiltered_df = monthly_prc_change[filtered_datasets].copy()
+
+    # all_scenarios_filtered_df = only scenarios that passed IQR filter
+    # (scenarios present in the weighted averages file)
+    filtered_cols = [c for c in filtered_datasets if c in filtered_scenario_names]
+    all_scenarios_filtered_df = monthly_prc_change[filtered_cols].copy()
+
+    print(f"Full ensemble (pre-IQR): {len(all_scenarios_unfiltered_df.columns)} scenarios")
+    print(f"Filtered ensemble (post-IQR): {len(all_scenarios_filtered_df.columns)} scenarios")
+
+    # Create comprehensive synthesis figure
     print(f"\n{'='*80}")
-    print(f"CREATING VISUALIZATIONS")
+    print(f"CREATING VISUALIZATION")
     print(f"{'='*80}\n")
 
-    # 1. Quantile space visualization with selected scenarios
-    print("1. Creating quantile space visualization...")
-    quantile_fname = f'{figures_dir}/{node}_quantile_space_selected_{hydro_model_source}_{ssp_period}.png'
-    plot_quantile_space_with_selected_scenarios(
-        quantile_matrix,
+    plot_selected_scenarios(
         selected_scenarios_df,
-        node,
-        quantile_fname
-    )
-    print(f"   Saved: {quantile_fname}")
-
-    # 2. Monthly comparison plot
-    print("2. Creating monthly comparison plot...")
-    plot_scenario_monthly_comparison(
-        selected_scenarios_df,
-        all_scenarios_df,
-        node,
-        hydro_model_source,
-        ssp_period,
-        figures_dir
-    )
-
-    # 3. Comprehensive synthesis figure (3 panels)
-    print("3. Creating comprehensive synthesis figure...")
-    plot_comprehensive_synthesis(
-        selected_scenarios_df,
-        all_scenarios_df,
+        all_scenarios_filtered_df,
+        all_scenarios_unfiltered_df,
         monthly_means_df,
         node,
         hydro_model_source,
         ssp_period,
         figures_dir,
-        weight_scheme=weight_scheme
+        weight_scheme=weight_scheme,
+        scenarios_to_show=['low', 'high']
     )
 
     print(f"\n{'='*80}")
     print(f"VISUALIZATION COMPLETE")
     print(f"{'='*80}")
-    print(f"\nAll figures saved to: {figures_dir}")
+    print(f"\nFigure saved to: {figures_dir}")
 
 
 if __name__ == "__main__":
