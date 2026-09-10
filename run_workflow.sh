@@ -20,7 +20,10 @@ np=$(($SLURM_NTASKS_PER_NODE * $SLURM_NNODES))
 # mpirun -n $np python3 run_pywrdrb_simulations.py
 
 # Run plotting with single process
-python3 plot_model_results.py
+# python3 plot_model_results.py
+
+# Run PRMS vs VIC model comparison for historic period
+python3 S1_compare_historic_data.py
 
 # python3 plot_dataset_pval_tests.py
 # python3 calculate_annual_monthly_stats.py

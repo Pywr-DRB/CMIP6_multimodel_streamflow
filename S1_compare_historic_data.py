@@ -276,16 +276,16 @@ if __name__ == "__main__":
     gs = fig.add_gridspec(3, 3, hspace=0.35, wspace=0.35)
     
     month_names = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
-    colors = {'Observed': 'black', 'PRMS': '#2E86AB', 'VIC': '#A23B72'}
+    colors = {'Historical': 'black', 'PRMS': '#2E86AB', 'VIC': '#A23B72'}
     
     # Plot 1: Monthly Mean Climatology
     ax1 = fig.add_subplot(gs[0, :2])
-    ax1.plot(range(1, 13), obs_monthly, 'o-', label='Observed', color=colors['Observed'], linewidth=2.5, markersize=8)
+    ax1.plot(range(1, 13), obs_monthly, 'o-', label='Historical', color=colors['Historical'], linewidth=2.5, markersize=8)
     ax1.plot(range(1, 13), prms_monthly, 's--', label='PRMS', color=colors['PRMS'], linewidth=2, markersize=7)
     ax1.plot(range(1, 13), vic_monthly, '^--', label='VIC', color=colors['VIC'], linewidth=2, markersize=7)
-    ax1.set_xlabel('Month', fontsize=11, fontweight='bold')
-    ax1.set_ylabel('Mean Flow (MGD)', fontsize=11, fontweight='bold')
-    ax1.set_title('(a) Monthly Mean Flow Climatology', fontsize=12, fontweight='bold', loc='left')
+    ax1.set_xlabel('Month', fontsize=11)
+    ax1.set_ylabel('Mean Flow (MGD)', fontsize=11)
+    ax1.set_title('(a) Monthly Mean Flow Climatology', fontsize=12, loc='left')
     ax1.set_xticks(range(1, 13))
     ax1.set_xticklabels(month_names)
     ax1.legend(frameon=True, fontsize=10)
@@ -293,12 +293,12 @@ if __name__ == "__main__":
     
     # Plot 2: Monthly Fraction of Annual Flow
     ax2 = fig.add_subplot(gs[0, 2])
-    ax2.plot(range(1, 13), obs_monthly_frac, 'o-', label='Observed', color=colors['Observed'], linewidth=2.5, markersize=8)
+    ax2.plot(range(1, 13), obs_monthly_frac, 'o-', label='Historical', color=colors['Historical'], linewidth=2.5, markersize=8)
     ax2.plot(range(1, 13), prms_monthly_frac, 's--', label='PRMS', color=colors['PRMS'], linewidth=2, markersize=7)
     ax2.plot(range(1, 13), vic_monthly_frac, '^--', label='VIC', color=colors['VIC'], linewidth=2, markersize=7)
-    ax2.set_xlabel('Month', fontsize=11, fontweight='bold')
-    ax2.set_ylabel('% of Annual Flow', fontsize=11, fontweight='bold')
-    ax2.set_title('(b) Seasonal Water Distribution', fontsize=12, fontweight='bold', loc='left')
+    ax2.set_xlabel('Month', fontsize=11)
+    ax2.set_ylabel('% of Annual Flow', fontsize=11)
+    ax2.set_title('(b) Seasonal Water Distribution', fontsize=12, loc='left')
     ax2.set_xticks(range(1, 13))
     ax2.set_xticklabels(month_names)
     ax2.legend(fontsize=9)
@@ -306,12 +306,12 @@ if __name__ == "__main__":
     
     # Plot 3: Coefficient of Variation
     ax3 = fig.add_subplot(gs[1, 0])
-    ax3.plot(range(1, 13), obs_cv, 'o-', label='Observed', color=colors['Observed'], linewidth=2.5, markersize=8)
+    ax3.plot(range(1, 13), obs_cv, 'o-', label='Historical', color=colors['Historical'], linewidth=2.5, markersize=8)
     ax3.plot(range(1, 13), prms_cv, 's--', label='PRMS', color=colors['PRMS'], linewidth=2, markersize=7)
     ax3.plot(range(1, 13), vic_cv, '^--', label='VIC', color=colors['VIC'], linewidth=2, markersize=7)
-    ax3.set_xlabel('Month', fontsize=11, fontweight='bold')
-    ax3.set_ylabel('Coefficient of Variation', fontsize=11, fontweight='bold')
-    ax3.set_title('(c) Monthly Interannual Variability', fontsize=12, fontweight='bold', loc='left')
+    ax3.set_xlabel('Month', fontsize=11)
+    ax3.set_ylabel('Coefficient of Variation', fontsize=11)
+    ax3.set_title('(c) Monthly Interannual Variability', fontsize=12, loc='left')
     ax3.set_xticks(range(1, 13))
     ax3.set_xticklabels(month_names)
     ax3.legend(fontsize=9)
@@ -324,9 +324,9 @@ if __name__ == "__main__":
     ax4.bar(x - width/2, monthly_corr_prms, width, label='PRMS', color=colors['PRMS'], alpha=0.7)
     ax4.bar(x + width/2, monthly_corr_vic, width, label='VIC', color=colors['VIC'], alpha=0.7)
     ax4.axhline(y=0.8, color='green', linestyle='--', linewidth=1, alpha=0.5, label='Good (r>0.8)')
-    ax4.set_xlabel('Month', fontsize=11, fontweight='bold')
-    ax4.set_ylabel('Correlation Coefficient', fontsize=11, fontweight='bold')
-    ax4.set_title('(d) Monthly Temporal Correlation', fontsize=12, fontweight='bold', loc='left')
+    ax4.set_xlabel('Month', fontsize=11)
+    ax4.set_ylabel('Correlation Coefficient', fontsize=11)
+    ax4.set_title('(d) Monthly Temporal Correlation', fontsize=12, loc='left')
     ax4.set_xticks(x)
     ax4.set_xticklabels(month_names)
     ax4.set_ylim([0, 1])
@@ -338,9 +338,9 @@ if __name__ == "__main__":
     x = np.arange(12)
     ax5.bar(x - width/2, monthly_rmse_prms, width, label='PRMS', color=colors['PRMS'], alpha=0.7)
     ax5.bar(x + width/2, monthly_rmse_vic, width, label='VIC', color=colors['VIC'], alpha=0.7)
-    ax5.set_xlabel('Month', fontsize=11, fontweight='bold')
-    ax5.set_ylabel('RMSE (MGD)', fontsize=11, fontweight='bold')
-    ax5.set_title('(e) Monthly Root Mean Square Error', fontsize=12, fontweight='bold', loc='left')
+    ax5.set_xlabel('Month', fontsize=11)
+    ax5.set_ylabel('RMSE (MGD)', fontsize=11)
+    ax5.set_title('(e) Monthly Root Mean Square Error', fontsize=12, loc='left')
     ax5.set_xticks(x)
     ax5.set_xticklabels(month_names)
     ax5.legend(fontsize=9)
@@ -357,9 +357,9 @@ if __name__ == "__main__":
     lims = [min(obs_annual.min(), prms_annual.min(), vic_annual.min()),
             max(obs_annual.max(), prms_annual.max(), vic_annual.max())]
     ax6.plot(lims, lims, 'k--', alpha=0.5, linewidth=1)
-    ax6.set_xlabel('Observed Annual Mean (MGD)', fontsize=11, fontweight='bold')
-    ax6.set_ylabel('Modeled Annual Mean (MGD)', fontsize=11, fontweight='bold')
-    ax6.set_title('(f) Annual Mean Flow Agreement', fontsize=12, fontweight='bold', loc='left')
+    ax6.set_xlabel('Historical Annual Mean (MGD)', fontsize=11)
+    ax6.set_ylabel('Modeled Annual Mean (MGD)', fontsize=11)
+    ax6.set_title('(f) Annual Mean Flow Agreement', fontsize=12, loc='left')
     ax6.legend(fontsize=9)
     ax6.grid(True, alpha=0.3)
     
@@ -389,8 +389,8 @@ if __name__ == "__main__":
     bars1 = ax7.bar(x - width/2, prms_norm, width, label='PRMS', color=colors['PRMS'], alpha=0.7)
     bars2 = ax7.bar(x + width/2, vic_norm, width, label='VIC', color=colors['VIC'], alpha=0.7)
     
-    ax7.set_ylabel('Normalized Performance (%)', fontsize=11, fontweight='bold')
-    ax7.set_title('(g) Overall Model Performance Comparison (Higher is Better)', fontsize=12, fontweight='bold', loc='left')
+    ax7.set_ylabel('Normalized Performance (%)', fontsize=11)
+    ax7.set_title('(g) Overall Model Performance Comparison (Higher is Better)', fontsize=12, loc='left')
     ax7.set_xticks(x)
     ax7.set_xticklabels(metrics_names, fontsize=10)
     ax7.set_ylim([0, 105])
@@ -406,7 +406,7 @@ if __name__ == "__main__":
                     f'{height:.0f}', ha='center', va='bottom', fontsize=8)
     
     fig.suptitle('PRMS vs VIC Hydrologic Model Comparison: NYC Aggregate Inflows', 
-                 fontsize=14, fontweight='bold', y=0.995)
+                 fontsize=14, y=0.995)
     
     # Save figure
     output_dir = 'figures'
