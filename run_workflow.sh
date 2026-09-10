@@ -6,26 +6,21 @@
 #SBATCH --ntasks-per-node=40
 #SBATCH --exclusive
 
-# Load modules and environment
 module load python/3.11.5
 source venv/bin/activate
 
-# number of taks
 np=$(($SLURM_NTASKS_PER_NODE * $SLURM_NNODES))
 
-# run preprocessing using mpi
-# mpirun -n $np python3 01_prep_pywrdrb_inputs.py
+# Pywr-DRB workflow. Only needed when new datasets are added; the processed inputs
+# are tracked in the repo and the simulation outputs are not used by the S* scripts.
+# python P1_extract_netcdf_flows.py
+# mpirun -n $np python P2_prep_pywrdrb_inputs.py
+# mpirun -n $np python P3_run_pywrdrb_simulations.py
+# python P4_plot_nyc_storages.py
 
-# run pywrdrb simulations using mpi
-# mpirun -n $np python3 run_pywrdrb_simulations.py
-
-# Run plotting with single process
-# python3 plot_model_results.py
-
-# Run PRMS vs VIC model comparison for historic period
-python3 S1_compare_historic_data.py
-
-# python3 plot_dataset_pval_tests.py
-# python3 calculate_annual_monthly_stats.py
-# python3 get_monthly_shift_scenarios.py
-# python3 plot_dataset_comparison.py
+# Scenario selection workflow (S2 must precede S3; S3 must precede S4 and S5)
+python S1_compare_historic_data.py
+python S2_calculate_annual_monthly_stats.py
+python S3_find_scenarios.py
+python S4_plot_scenarios.py
+python S5_plot_annual_flows.py

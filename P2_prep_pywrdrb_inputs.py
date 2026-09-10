@@ -1,17 +1,10 @@
-### Processing additional inputs ########################
-# We need to create two CSV files from the gage flow:
-# 1. catchment_inflow_mgd.csv : 
-#       This contains the marginal inflow at each node, 
-#       calculated by iteratively subtracting upstream flows,
-#       and accounting for travel time. 
-#       E.g., inflow at Montague is calculated by as total Montague flow
-#       minus upstream reservoir inflows. 
-# 2. predicted_inflow_mgd.csv:
-#       This contains 1-4 day ahead inflow predictions made
-#       using a AR model. These are used in pywrdrb to determine
-#       NYC releases for Montague, accounting for travel time
-
-
+"""
+Build the Pywr-DRB inputs derived from gage_flow_mgd.csv for every dataset in pywrdrb/inputs:
+catchment inflows (upstream flows subtracted, accounting for travel time), 1-4 day ahead
+predicted inflows used for NYC release decisions, and extrapolated and predicted NYC and NJ
+diversions. Datasets are split across MPI ranks:
+    mpirun -n <N> python P2_prep_pywrdrb_inputs.py
+"""
 import os
 import pandas as pd
 from mpi4py import MPI
@@ -19,10 +12,11 @@ from mpi4py import MPI
 import pywrdrb
 from pywrdrb.pre.flows import _subtract_upstream_catchment_inflows
 
-from config import DATASET_NAMES
+from config import DATASET_NAMES, INPUT_DIR
 
-REDO_INFLOW_CALCULATION = False
-REDO_INFLOW_PREDICTION = False
+# Set a stage to False to skip it when its outputs already exist
+REDO_INFLOW_CALCULATION = True
+REDO_INFLOW_PREDICTION = True
 REDO_DIVERSION_EXTRAPOLATION = True
 REDO_DIVERSION_PREDICTION = True
 
@@ -39,14 +33,12 @@ else:
     size = 1
     print("MPI not enabled.")
 
-# Setup pathnavigator
+# Register local datasets with pywrdrb
 pn_config = pywrdrb.get_pn_config()
 for dataset in DATASET_NAMES:
-    f = f"pywrdrb/inputs/{dataset}"
-    pn_config[f"flows/{dataset}"] = os.path.abspath(f)
+    pn_config[f"flows/{dataset}"] = os.path.join(INPUT_DIR, dataset)
 pywrdrb.load_pn_config(pn_config)
 
-# Split the dataset names across ranks
 if USE_MPI:
     local_rank_datasets = [
         dataset for i, dataset in enumerate(DATASET_NAMES) if i % size == rank
@@ -63,18 +55,14 @@ if __name__ == "__main__":
 
         ## Calculate catchment inflows
         if REDO_INFLOW_CALCULATION:
-            f = f"pywrdrb/inputs/{dataset}/gage_flow_mgd.csv"
-            flow_df = pd.read_csv(
-                f, index_col=0,
-                parse_dates=True,
-            )
+            f = os.path.join(INPUT_DIR, dataset, "gage_flow_mgd.csv")
+            flow_df = pd.read_csv(f, index_col=0, parse_dates=True)
 
             # Iteratively subtract upstream catchment flows
             inflow_df = _subtract_upstream_catchment_inflows(flow_df)
             inflow_df.index.name = "datetime"
             
-            # Save the inflow_df to a CSV file
-            f = f"pywrdrb/inputs/{dataset}/catchment_inflow_mgd.csv"
+            f = os.path.join(INPUT_DIR, dataset, "catchment_inflow_mgd.csv")
             inflow_df.to_csv(f)
 
         ## Generate predicted inflows

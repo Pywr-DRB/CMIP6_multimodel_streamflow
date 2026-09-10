@@ -1,0 +1,8 @@
+# Results in this repo were generated with Python 3.11.5 and pywrdrb installed from
+# git commit 949501fefd73241593b072cd0f68f72fae18a59a of https://github.com/Pywr-DRB/Pywr-DRB
+numpy==2.3.1
+pandas==2.3.0
+matplotlib==3.10.3
+netCDF4==1.7.2
+mpi4py==4.1.0
+pywrdrb @ git+https://github.com/Pywr-DRB/Pywr-DRB.git

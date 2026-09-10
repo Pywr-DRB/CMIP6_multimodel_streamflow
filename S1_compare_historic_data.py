@@ -1,52 +1,28 @@
 """
-This script is used to compare historic streamflow datasets from the CMIP downscaled, 
-to determine which model configurations match historic monthly patterns sufficiently well. 
+Compare the PRMS and VIC5 historic runs (Daymet forcing, 1980-2019) against the
+pub_nhmv10_BC_withObsScaled reconstruction to decide which hydrologic model better
+reproduces historic NYC aggregate inflow. NYC inflow is used because it is well gauged
+and is the quantity the downstream study perturbs.
 
-In this comparison, we want to ignore all of the ssp<x> scenarios and focus only on historic data. 
-The goal is to figure out which hydrologic model (PRMS vs VIC5) is better and reproducing historic seasonal flow patterns. 
-
-Specifically, I want to consider the following datasets:
-- PRMS_RAPID_Daymet2019_1980_2019
-- VIC5_RAPID_Daymet2019_v20200704D_1980_2019
-
-With historic flows from:
-- pub_nhmv10_BC_withObsScaled
-
-The analysis will be based on aggregate NYC inflows, since those are well gauged in the historic record 
-and relevant for the model. 
-
-Statistical comparisons include:
-1. Monthly mean flow patterns (climatology)
-2. Seasonal timing analysis (peak flow timing)
-3. Monthly coefficient of variation (interannual variability)
-4. Nash-Sutcliffe Efficiency (NSE) - overall fit
-5. Percent Bias (PBIAS) - systematic errors
-6. Monthly correlation coefficients - temporal pattern matching
-7. Root Mean Square Error (RMSE) by month
-
+Metrics: monthly mean climatology, monthly coefficient of variation, Nash-Sutcliffe
+efficiency, percent bias, monthly correlation, monthly RMSE, peak-flow timing, and
+mean monthly fraction of annual flow. Prints a table per metric and a win count,
+and saves figures/S1_model_comparison_summary.png.
 """
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pywrdrb
-from config import DATASET_NAMES
+from config import DATASET_NAMES, INPUT_DIR, FIGURES_DIR
 
 
 if __name__ == "__main__":
-    ### Load data through pywrdrb API    
-    # Setup pathnavigator
+    # Register the local datasets with pywrdrb, then load the three of interest
     pn_config = pywrdrb.get_pn_config()
     for dataset in DATASET_NAMES:
-        f = f"pywrdrb/inputs/{dataset}"
-        pn_config[f"flows/{dataset}"] = os.path.abspath(f)
-
+        pn_config[f"flows/{dataset}"] = os.path.join(INPUT_DIR, dataset)
     pywrdrb.load_pn_config(pn_config)
-
-    pn = pywrdrb.get_pn_object()
-    sc_flows = list(pn.sc.to_dict().keys())
-    flowtype_opts = [i.replace("flows/", "") for i in sc_flows]
-
 
     flowtypes = [
         'PRMS_RAPID_Daymet2019_1980_2019',
@@ -57,31 +33,24 @@ if __name__ == "__main__":
     data = pywrdrb.Data(results_sets=['major_flow'],)
     data.load_hydrologic_model_flow(flowtypes)
     
-    # The data object will contain the gage_flow_mgd DataFrames for each flowtype
     loaded_datasets = data.major_flow.keys()
-    pywrdrb_nodes = data.major_flow[flowtypes[0]][0].columns.tolist()
-    print(f"Loaded flows at {len(pywrdrb_nodes)} nodes for {len(loaded_datasets)} datasets.")
+    print(f"Loaded flows for {len(loaded_datasets)} datasets.")
 
-    # For each of the loaded datasets, calculate NYC aggregate inflow
-    # this is the sum of flows for:
+    # NYC aggregate inflow = sum of the three reservoir inflow gages
     nyc_inflow_gages = ["01425000", "01417000", "01436000"]
-
-    # save in data object for later
     for dataset in loaded_datasets:
         df = data.major_flow[dataset][0]
         nyc_inflow = df[nyc_inflow_gages].sum(axis=1)
         data.major_flow[dataset][0]['nyc_inflow'] = nyc_inflow
     
     
-    ### Extract NYC inflow timeseries for analysis
+    ### NYC inflow series on a common date range (after model warmup)
     obs_data = data.major_flow['pub_nhmv10_BC_withObsScaled'][0]['nyc_inflow']
     prms_data = data.major_flow['PRMS_RAPID_Daymet2019_1980_2019'][0]['nyc_inflow']
     vic_data = data.major_flow['VIC5_RAPID_Daymet2019_v20200704D_1980_2019'][0]['nyc_inflow']
     
-    # Find common date range for fair comparison
     common_dates = obs_data.index.intersection(prms_data.index).intersection(vic_data.index)
     
-    # If common dates are <1983-10-01, then restrict to after that due to model warmup
     common_dates = common_dates[common_dates >= pd.Timestamp('1983-10-01')]
     
     obs = obs_data.loc[common_dates]
@@ -91,7 +60,7 @@ if __name__ == "__main__":
     print(f"\nAnalyzing {len(common_dates)} days from {common_dates[0]} to {common_dates[-1]}")
     
     
-    ### ANALYSIS 1: Monthly Mean Climatology
+    ### Monthly Mean Climatology
     obs_monthly = obs.groupby(obs.index.month).mean()
     prms_monthly = prms.groupby(prms.index.month).mean()
     vic_monthly = vic.groupby(vic.index.month).mean()
@@ -107,7 +76,7 @@ if __name__ == "__main__":
               f"{vic_monthly[month]:8.1f} | {prms_monthly_error[month]:11.1f} | {vic_monthly_error[month]:10.1f}")
     
     
-    ### ANALYSIS 2: Coefficient of Variation by Month
+    ### Coefficient of Variation by Month
     obs_cv = obs.groupby(obs.index.month).std() / obs.groupby(obs.index.month).mean()
     prms_cv = prms.groupby(prms.index.month).std() / prms.groupby(prms.index.month).mean()
     vic_cv = vic.groupby(vic.index.month).std() / vic.groupby(vic.index.month).mean()
@@ -122,7 +91,7 @@ if __name__ == "__main__":
               f"{vic_cv[month]:8.3f} | {cv_prms_error[month]:11.3f} | {cv_vic_error[month]:10.3f}")
     
     
-    ### ANALYSIS 3: Nash-Sutcliffe Efficiency (NSE)
+    ### Nash-Sutcliffe Efficiency (NSE)
     def calculate_nse(observed, modeled):
         numerator = np.sum((observed - modeled) ** 2)
         denominator = np.sum((observed - np.mean(observed)) ** 2)
@@ -137,7 +106,7 @@ if __name__ == "__main__":
     print(f"Better model: {'PRMS' if nse_prms > nse_vic else 'VIC'}")
     
     
-    ### ANALYSIS 4: Percent Bias (PBIAS)
+    ### Percent Bias (PBIAS)
     pbias_prms = np.sum(prms.values - obs.values) / np.sum(obs.values) * 100
     pbias_vic = np.sum(vic.values - obs.values) / np.sum(obs.values) * 100
     
@@ -147,7 +116,7 @@ if __name__ == "__main__":
     print(f"Lower absolute bias: {'PRMS' if abs(pbias_prms) < abs(pbias_vic) else 'VIC'}")
     
     
-    ### ANALYSIS 5: Monthly Correlation Coefficients
+    ### Monthly Correlation Coefficients
     monthly_corr_prms = []
     monthly_corr_vic = []
     
@@ -166,7 +135,7 @@ if __name__ == "__main__":
     print(f"Average: {np.mean(monthly_corr_prms):.3f} | {np.mean(monthly_corr_vic):.3f}")
     
     
-    ### ANALYSIS 6: RMSE by Month
+    ### RMSE by Month
     monthly_rmse_prms = []
     monthly_rmse_vic = []
     
@@ -184,7 +153,7 @@ if __name__ == "__main__":
         print(f"{month:5d} | {monthly_rmse_prms[month-1]:9.1f} | {monthly_rmse_vic[month-1]:9.1f}")
     
     
-    ### ANALYSIS 7: Peak Flow Timing
+    ### Peak Flow Timing
     obs_annual_peaks = obs.groupby(obs.index.year).idxmax()
     prms_annual_peaks = prms.groupby(prms.index.year).idxmax()
     vic_annual_peaks = vic.groupby(vic.index.year).idxmax()
@@ -201,7 +170,7 @@ if __name__ == "__main__":
     print(f"VIC timing error:  {abs(vic_peak_month - obs_peak_month):.1f} months")
     
     
-    ### ANALYSIS 8: Mean Monthly Fraction of Annual Flow
+    ### Mean Monthly Fraction of Annual Flow
     # Calculate monthly flow as % of annual total for each year, then average across years
     obs_monthly_frac = []
     prms_monthly_frac = []
@@ -244,12 +213,8 @@ if __name__ == "__main__":
     print(f"RMSE: {prms_frac_rmse:.2f} | {vic_frac_rmse:.2f}")
     
     
-    ### SUMMARY METRICS
-    print("\n" + "="*60)
-    print("OVERALL PERFORMANCE SUMMARY")
-    print("="*60)
-    
-    # Count which model performs better in each metric
+    ### Summary: which model wins each metric
+    print("\n=== OVERALL PERFORMANCE SUMMARY ===")
     metrics_summary = {
         'NSE': ('PRMS', nse_prms) if nse_prms > nse_vic else ('VIC', nse_vic),
         'PBIAS (lower abs)': ('PRMS', abs(pbias_prms)) if abs(pbias_prms) < abs(pbias_vic) else ('VIC', abs(pbias_vic)),
@@ -271,7 +236,7 @@ if __name__ == "__main__":
     print(f"\nRecommended model: {'PRMS' if prms_wins > vic_wins else 'VIC'}")
     
     
-    ### CREATE COMPREHENSIVE VISUALIZATION
+    ### Summary figure
     fig = plt.figure(figsize=(16, 10))
     gs = fig.add_gridspec(3, 3, hspace=0.35, wspace=0.35)
     
@@ -408,12 +373,9 @@ if __name__ == "__main__":
     fig.suptitle('PRMS vs VIC Hydrologic Model Comparison: NYC Aggregate Inflows', 
                  fontsize=14, y=0.995)
     
-    # Save figure
-    output_dir = 'figures'
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, 'S1_model_comparison_summary.png')
+    os.makedirs(FIGURES_DIR, exist_ok=True)
+    output_path = os.path.join(FIGURES_DIR, 'S1_model_comparison_summary.png')
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    print(f"\n\nFigure saved to: {output_path}")
-    
-    plt.show()
+    plt.close()
+    print(f"\nFigure saved to: {output_path}")
     

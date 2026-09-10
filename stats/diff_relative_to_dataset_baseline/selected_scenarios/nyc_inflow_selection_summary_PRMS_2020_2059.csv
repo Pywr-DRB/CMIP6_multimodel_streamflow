@@ -1,0 +1,3 @@
+scenario_type,gcm_name,weighted_avg_change,rank,total_scenarios,percentile
+low,PRMS_RAPID_MPI-ESM1-2-HR_ssp245_r1i1p1f1_DBCCA_Daymet_2020_2059,2.765704439401545,1,10,0
+high,PRMS_RAPID_CNRM-ESM2-1_ssp245_r1i1p1f2_DBCCA_Daymet_2020_2059,15.328560006786052,10,10,100
